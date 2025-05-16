@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.1.13
+
+- Fix Jquery issue with offsets when zoom with css
+
 ## 3.2.1.10
 
 - Add `Download project` button to download the project as a `.tar` file
