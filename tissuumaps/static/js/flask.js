@@ -126,7 +126,22 @@ flask.standalone.addLayer = function (filename) {
     const urlParams = new URLSearchParams(queryString);
     const path = urlParams.get('path')
     flask.standalone.backend.addLayer(path, filename, function(layerImg) {
-        if (layerImg["dzi"]!=null) {
+        // Handle multi-channel images returning multiple layers
+        if (layerImg["layers"]!=null && layerImg["layers"].length > 0) {
+            layerImg["layers"].forEach(function(layerData) {
+                var layerName = layerData["name"];
+                var tileSource = layerData["tileSource"];
+                tmapp.layers.push({
+                    name: layerName,
+                    tileSource: tileSource
+                });
+                var i = tmapp.layers.length - 2;
+                var layer = {"name":layerName, "tileSource":tileSource};
+                overlayUtils.addLayer(layer, i, true);
+                overlayUtils.addLayerSettings(layerName, tileSource, i, true);
+            });
+        }
+        else if (layerImg["dzi"]!=null) {
             var layerName = layerImg["name"];
             var tileSource = layerImg["dzi"];
             tmapp.layers.push({

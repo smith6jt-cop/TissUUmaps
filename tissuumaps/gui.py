@@ -847,6 +847,32 @@ class webEngine(QWebEngineView):
             else:
                 self.app.basedir = parts[0]
         imgPath = os.path.join(*parts[1:])
+        fullpath = os.path.abspath(os.path.join(self.app.basedir, imgPath))
+
+        # Check if this is a multi-channel image
+        is_multichannel, num_channels, channel_names = views._is_multichannel_tiff(
+            fullpath
+        )
+
+        if is_multichannel and num_channels > 1:
+            # Extract channels to separate layers
+            output_folder = os.path.join(
+                os.path.dirname(fullpath), ".tissuumaps", "channels"
+            )
+            layers = views._extract_multichannel_layers(fullpath, output_folder)
+            if layers:
+                # Return the layers for multi-channel support
+                path_abs = os.path.abspath(os.path.join(self.app.basedir, path))
+                for layer in layers:
+                    abs_source = os.path.join(
+                        self.app.basedir, layer["tileSource"].replace(".dzi", "")
+                    )
+                    rel_source = os.path.relpath(abs_source, path_abs)
+                    layer["tileSource"] = rel_source + ".dzi"
+
+                returnDict = {"layers": layers}
+                return returnDict
+
         if not imgPath.endswith(".dzi"):
             try:
                 views._get_slide(imgPath)
@@ -1016,9 +1042,9 @@ def main():
     QtGui.QSurfaceFormat.setDefaultFormat(fmt)
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
 
-    os.environ[
-        "QTWEBENGINE_CHROMIUM_FLAGS"
-    ] = "--no-sandbox --ignore-gpu-blacklist --enable-webgl-image-chromium"
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+        "--no-sandbox --ignore-gpu-blacklist --enable-webgl-image-chromium"
+    )
     if views.app.config["DEBUG_CLI"]:
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] += (
             " --remote-allow-origins=" + DEBUG_URL
