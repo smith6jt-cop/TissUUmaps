@@ -70,6 +70,8 @@ def _fnfilter(filename):
         return True
     elif filename.lower().endswith(".h5ad"):
         return True
+    elif filename.lower().endswith(".qptiff"):
+        return True
     return False
 
 
@@ -79,6 +81,181 @@ def _dfilter(filename):
     if ".tissuumaps" in filename:
         return False
     return True
+
+
+def _is_multichannel_tiff(filename):
+    """
+    Check if the file is a multi-channel TIFF, OME-TIFF, or QPTIFF.
+    Returns (is_multichannel, num_channels, channel_names) tuple.
+    """
+    filename_lower = filename.lower()
+    # Check if it's a supported multi-channel format
+    is_supported_format = (
+        filename_lower.endswith(".tif")
+        or filename_lower.endswith(".tiff")
+        or filename_lower.endswith(".ome.tif")
+        or filename_lower.endswith(".ome.tiff")
+        or filename_lower.endswith(".qptiff")
+    )
+
+    if not is_supported_format:
+        return False, 0, []
+
+    try:
+        img = pyvips.Image.new_from_file(filename)
+        # Get the number of pages/channels in the image
+        n_pages = img.get("n-pages") if "n-pages" in img.get_fields() else 1
+
+        # For OME-TIFF and similar formats, check if there are multiple channels
+        if n_pages > 1:
+            channel_names = []
+            for i in range(n_pages):
+                # Try to get channel name from metadata
+                try:
+                    page_img = pyvips.Image.new_from_file(filename, page=i)
+                    # Try to extract channel name from image description
+                    if "image-description" in page_img.get_fields():
+                        desc = page_img.get("image-description")
+                        # Try to parse OME-TIFF XML for channel name
+                        if "<Channel" in desc and 'Name="' in desc:
+                            match = re.search(r'Name="([^"]+)"', desc)
+                            if match:
+                                channel_names.append(match.group(1))
+                                continue
+                    channel_names.append(f"Channel_{i}")
+                except Exception:
+                    channel_names.append(f"Channel_{i}")
+            return True, n_pages, channel_names
+
+        # Also check for multi-band images (e.g., RGB, multi-channel fluorescence)
+        bands = img.bands
+        if bands > 4:  # More than RGBA, likely multi-channel
+            channel_names = [f"Channel_{i}" for i in range(bands)]
+            return True, bands, channel_names
+
+        return False, 0, []
+    except Exception:
+        logging.error(traceback.format_exc())
+        return False, 0, []
+
+
+def _extract_multichannel_layers(inputPath, outputFolder):
+    """
+    Extract channels from a multi-channel TIFF/OME-TIFF/QPTIFF file
+    and save each as a separate pyramidal 8-bit TIFF.
+    Returns a list of layer dictionaries with 'name' and 'tileSource' keys.
+    """
+    try:
+        img = pyvips.Image.new_from_file(inputPath)
+        n_pages = img.get("n-pages") if "n-pages" in img.get_fields() else 1
+        basename = os.path.splitext(os.path.basename(inputPath))[0]
+        # Remove secondary extension for ome.tif files
+        if basename.lower().endswith(".ome"):
+            basename = basename[:-4]
+
+        os.makedirs(outputFolder, exist_ok=True)
+        layers = []
+
+        if n_pages > 1:
+            # Multi-page TIFF (e.g., OME-TIFF with multiple channels as pages)
+            for i in range(n_pages):
+                channel_name = f"{basename}_Channel_{i}"
+                output_file = os.path.join(outputFolder, f"{channel_name}.tif")
+
+                if not os.path.isfile(output_file) or (
+                    os.path.getmtime(inputPath) > os.path.getmtime(output_file)
+                ):
+                    page_img = pyvips.Image.new_from_file(inputPath, page=i)
+                    _convert_to_pyramidal_8bit(page_img, output_file)
+
+                # Get relative path for tile source
+                rel_path = os.path.relpath(output_file, app.basedir)
+                layers.append({"name": channel_name, "tileSource": rel_path + ".dzi"})
+        else:
+            # Check for multi-band image
+            bands = img.bands
+            if bands > 4:
+                # Extract each band as a separate channel
+                for i in range(bands):
+                    channel_name = f"{basename}_Channel_{i}"
+                    output_file = os.path.join(outputFolder, f"{channel_name}.tif")
+
+                    if not os.path.isfile(output_file) or (
+                        os.path.getmtime(inputPath) > os.path.getmtime(output_file)
+                    ):
+                        band_img = img.extract_band(i)
+                        _convert_to_pyramidal_8bit(band_img, output_file)
+
+                    rel_path = os.path.relpath(output_file, app.basedir)
+                    layers.append(
+                        {"name": channel_name, "tileSource": rel_path + ".dzi"}
+                    )
+            else:
+                # Single channel or RGB, treat as single layer
+                output_file = os.path.join(outputFolder, f"{basename}.tif")
+                if not os.path.isfile(output_file) or (
+                    os.path.getmtime(inputPath) > os.path.getmtime(output_file)
+                ):
+                    _convert_to_pyramidal_8bit(img, output_file)
+
+                rel_path = os.path.relpath(output_file, app.basedir)
+                layers.append({"name": basename, "tileSource": rel_path + ".dzi"})
+
+        return layers
+    except Exception:
+        logging.error("Error extracting multi-channel image:")
+        logging.error(traceback.format_exc())
+        return []
+
+
+def _convert_to_pyramidal_8bit(imgVips, outputPath):
+    """
+    Convert a pyvips image to pyramidal 8-bit TIFF.
+    Handles automatic rescaling to 8-bit if needed.
+    """
+    try:
+        min_percent = app.config["VIPS_MIN_OUTLIER_PERC"]
+        max_percent = app.config["VIPS_MAX_OUTLIER_PERC"]
+
+        minVal = imgVips.percent(min_percent)
+        maxVal = imgVips.percent(max_percent)
+
+        if app.config["VIPS_EXCLUDE_MIN_INTENSITY"]:
+            absoluteMinVal = imgVips.min()
+            imgVips_tmp = (
+                (imgVips == absoluteMinVal).bandand().ifthenelse(maxVal + 1, imgVips)
+            )
+            minVal = imgVips_tmp.percent(min_percent)
+
+        if minVal == maxVal:
+            minVal = 0
+            maxVal = 255
+
+        # Check if rescaling is needed (not 8-bit)
+        if app.config["VIPS_FORCE_RESCALE"] or imgVips.min() < 0 or imgVips.max() > 255:
+            logging.debug(f"Rescaling image: {minVal} - {maxVal} to 0 - 255")
+            imgVips = (255.0 * (imgVips - minVal)) / (maxVal - minVal)
+            imgVips = (imgVips < 0).ifthenelse(0, imgVips)
+            imgVips = (imgVips > 255).ifthenelse(255, imgVips)
+
+        imgVips = imgVips.scaleimage()
+
+        # Save as pyramidal TIFF
+        imgVips.tiffsave(
+            outputPath,
+            pyramid=True,
+            tile=True,
+            tile_width=256,
+            tile_height=256,
+            compression="jpeg",
+            Q=app.config["VIPS_JPEG_COMPRESSION"],
+            properties=True,
+        )
+        logging.debug(f"Saved pyramidal 8-bit TIFF: {outputPath}")
+    except Exception:
+        logging.error("Error converting to pyramidal 8-bit TIFF:")
+        logging.error(traceback.format_exc())
+        raise
 
 
 def check_auth(username, password):
@@ -472,13 +649,46 @@ def slide(filename):
     path = request.args.get("path")
     if not path:
         path = "./"
-    path = os.path.abspath(os.path.join(app.basedir, path, filename))
-    if not os.path.isfile(path) and not os.path.isfile(path + ".dzi"):
+    fullpath = os.path.abspath(os.path.join(app.basedir, path, filename))
+    if not os.path.isfile(fullpath) and not os.path.isfile(fullpath + ".dzi"):
         abort(404)
-    # slide = _get_slide(path)
-    slide_url = os.path.basename(path) + ".dzi"  # url_for("dzi", path=path)
+
+    # Check if this is a multi-channel image
+    is_multichannel, num_channels, channel_names = _is_multichannel_tiff(fullpath)
+
+    if is_multichannel and num_channels > 1:
+        # Extract channels to separate layers
+        output_folder = os.path.join(
+            os.path.dirname(fullpath), ".tissuumaps", "channels"
+        )
+        layers = _extract_multichannel_layers(fullpath, output_folder)
+        if layers:
+            # Convert absolute paths to relative paths from the request path
+            for layer in layers:
+                # Make tileSource relative to the request path
+                abs_source = os.path.join(
+                    app.basedir, layer["tileSource"].replace(".dzi", "")
+                )
+                rel_source = os.path.relpath(
+                    abs_source, os.path.join(app.basedir, path)
+                )
+                layer["tileSource"] = rel_source + ".dzi"
+
+            jsonProject = {"layers": layers}
+            return render_template(
+                "tissuumaps.html",
+                plugins=[p["module"] for p in app.config["PLUGINS"]],
+                jsonProject=jsonProject,
+                isStandalone=app.config["isStandalone"],
+                readOnly=app.config["READ_ONLY"],
+                version=app.config["VERSION"],
+                schema_version=current_schema_module.VERSION,
+            )
+
+    # Standard single-layer handling
+    slide_url = os.path.basename(fullpath) + ".dzi"
     jsonProject = {
-        "layers": [{"name": os.path.basename(path), "tileSource": slide_url}]
+        "layers": [{"name": os.path.basename(fullpath), "tileSource": slide_url}]
     }
     return render_template(
         "tissuumaps.html",
