@@ -118,8 +118,6 @@ def _is_multichannel_tiff(filename):
                         desc = page_img.get("image-description")
                         # Try to parse OME-TIFF XML for channel name
                         if "<Channel" in desc and 'Name="' in desc:
-                            import re
-
                             match = re.search(r'Name="([^"]+)"', desc)
                             if match:
                                 channel_names.append(match.group(1))
