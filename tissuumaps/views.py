@@ -52,7 +52,13 @@ from tissuumaps_schema.utils import (
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import RequestRedirect
 
-from tissuumaps import app, read_h5ad, tarfile_stream
+# NB: read_h5ad is imported lazily inside the h5ad view, not here. It imports
+# h5py at module scope, and pyvips (imported above) has already pulled the
+# system libhdf5 into the process by then. When those two disagree about the
+# HDF5 version -- an h5py wheel built against 2.0 meeting a system libhdf5
+# 1.10, say -- h5py raises "ValueError: Not a datatype" and the whole server
+# fails to start, even for users who never open a .h5ad file.
+from tissuumaps import app, tarfile_stream
 
 import openslide  # isort: skip
 from openslide import OpenSlide  # isort: skip
@@ -1095,6 +1101,10 @@ def h5ad(filename, ext):
     if "Referer" in request.headers.keys():
         if "h5Utils_worker.js" in request.headers["Referer"]:
             return send_file_partial(completePath)
+
+    # Imported here rather than at module scope -- see the note by the
+    # `from tissuumaps import app, tarfile_stream` import above.
+    from tissuumaps import read_h5ad
 
     state = read_h5ad.h5ad_to_tmap(
         app.basedir, os.path.join(path, filename) + "." + ext
