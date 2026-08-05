@@ -27,6 +27,20 @@ from urllib.parse import parse_qs, urlparse
 # ruff: noqa: E402
 os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = "/opt/homebrew/lib"
 
+# openslide MUST be imported before pyvips. Both bring their own copy of lcms2;
+# whichever loads first wins, and if it is libvips' copy then OpenSlide's ICC
+# entry points misbehave -- openslide_get_icc_profile_size() returns -1, and
+# openslide-python turns that into "ValueError: Array length must be >= 0, not
+# -1" inside OpenSlide.__init__. Every slide then fails to open, so the server
+# 404s on all DZI requests, regardless of the file.
+#
+# Only bites with OpenSlide >= 4.0 (the release that added the ICC API); with
+# 3.4.1 openslide-python skips the call, which is why this can look fine on one
+# machine and be completely broken on another.
+import openslide  # isort: skip
+from openslide import OpenSlide  # isort: skip
+from openslide.deepzoom import DeepZoomGenerator  # isort: skip
+
 import pyvips
 
 # Flask dependencies
@@ -59,10 +73,6 @@ from werkzeug.routing import RequestRedirect
 # 1.10, say -- h5py raises "ValueError: Not a datatype" and the whole server
 # fails to start, even for users who never open a .h5ad file.
 from tissuumaps import app, tarfile_stream
-
-import openslide  # isort: skip
-from openslide import OpenSlide  # isort: skip
-from openslide.deepzoom import DeepZoomGenerator  # isort: skip
 
 
 def _fnfilter(filename):
