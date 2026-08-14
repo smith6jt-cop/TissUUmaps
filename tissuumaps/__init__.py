@@ -48,6 +48,27 @@ DEBUG_CLI = False
 READ_ONLY = False
 PROJECT_LIST = False
 
+# Branding, overridable from a config file so a deployment can badge the viewer
+# without patching templates. Defaults are TissUUmaps' own, so an installation
+# that sets none of these looks exactly as it does today.
+#
+# BRAND_CREDIT keeps the "powered by TissUUmaps" line and its link visible even
+# when the rest is rebranded. It defaults to on so that rebranding never silently
+# drops credit. No licensing claim is made here -- this file's own header carries
+# GPLv3 boilerplate while LICENSE and setup.cfg both say MIT, and that
+# contradiction is not one a config comment should try to settle.
+BRAND_NAME = "TissUUmaps"
+BRAND_URL = "https://tissuumaps.github.io/"
+BRAND_BADGE_LOGO = "misc/logo.svg"  # bottom-left badge, ~22px tall
+BRAND_NAVBAR_LOGO = "misc/logo_40.png"  # navbar brand mark
+BRAND_NAVBAR_LOGO_WIDTH = 25
+BRAND_NAVBAR_LOGO_HEIGHT = 27
+BRAND_CREDIT = True
+# Set when the logo already contains the product name, so the page does not print
+# it twice beside its own wordmark. TissUUmaps' own mark is a symbol, hence False.
+BRAND_LOGO_INCLUDES_NAME = False
+BRAND_FAVICON = "misc/favicon.ico"
+
 # determine if application is a script file or frozen exe
 if getattr(sys, "frozen", False):
     template_folder = os.path.join(sys._MEIPASS, "templates")

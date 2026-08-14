@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
   <head>
-    <title>TissUUmaps</title>
+    <title>{{ brand_name }}</title>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
@@ -47,16 +47,19 @@
           <a
             class="navbar-brand pt-0"
             target="_blank"
-            href="https://tissuumaps.github.io/"
+            rel="noopener noreferrer"
+            href="{{ brand_url }}"
           >
             <img
-              src="static/misc/logo_40.png"
-              width="25"
-              height="27"
-              alt="TissUUmaps Logotype"
-              title="TissUUmaps"
+              src="static/{{ brand_navbar_logo }}"
+              width="{{ brand_navbar_logo_width }}"
+              height="{{ brand_navbar_logo_height }}"
+              alt="{{ brand_name }} Logotype"
+              title="{{ brand_name }}"
             />
-            <span class="ms-2 pt-2 small">TissUUmaps</span>
+            {% if not brand_logo_includes_name %}<span class="ms-2 pt-2 small"
+              >{{ brand_name }}</span
+            >{% endif %}
           </a>
           <button
             class="navbar-toggler"
@@ -96,7 +99,10 @@
                   </li>
                   <li>
                     <a class="dropdown-item" href="#" id="see_version">
-                      <span>TissUUmaps version</span>
+                      <span
+                        >{% if brand_name != 'TissUUmaps' %}{{ brand_name }}
+                        &middot; {% endif %}TissUUmaps version</span
+                      >
                     </a>
                   </li>
                 </ul>
@@ -669,12 +675,29 @@
       class="d-none"
       style="left: 10px; bottom: 10px; z-index: 100"
     >
+      <!-- The element id stays powered_by_tissuumaps: it is referenced by the
+           embed logic below and by several bundled plugins, and renaming it
+           would break them for no visible gain. -->
       <div class="px-1 me-3 viewer-layer">
         <small
-          ><img src="static/misc/logo.svg" height="22px" /> Powered by
-          <a href="https://tissuumaps.github.io/" target="_blank"
-            >TissUUmaps</a
-          ></small
+          ><a href="{{ brand_url }}" target="_blank" rel="noopener noreferrer"
+            ><img
+              src="static/{{ brand_badge_logo }}"
+              height="22px"
+              alt="{{ brand_name }}"
+              title="{{ brand_name }}"
+            />{% if not brand_logo_includes_name %} {{ brand_name }}{% endif
+            %}</a
+          >{% if brand_credit and brand_name != "TissUUmaps" %}
+          <span class="opacity-75"
+            >powered by
+            <a
+              href="https://tissuumaps.github.io/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >TissUUmaps</a
+            ></span
+          >{% endif %}</small
         >
       </div>
     </div>
@@ -796,8 +819,15 @@
       if (window!=window.top) {
           document.getElementById("main-navbar").classList.add("collapse");
           elt = document.getElementById("powered_by_tissuumaps");
+          // attachToViewer/autoFade match the toggler below. Without
+          // attachToViewer, OpenSeadragon never positions this control against
+          // the viewer, so the badge lands in the default flow position -- on
+          // top of the scale bar, where nothing of it is visible. autoFade would
+          // additionally fade the branding out whenever the pointer leaves.
           tmapp["ISS_viewer"].addControl(elt,{
               anchor: OpenSeadragon.ControlAnchor.BOTTOM_LEFT,
+              attachToViewer: true,
+              autoFade: false
           });
           elt.classList.remove("d-none");
           elt = document
