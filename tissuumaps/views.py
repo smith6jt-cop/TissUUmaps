@@ -599,6 +599,28 @@ def get_view_function(url, method="GET"):
         return None
 
 
+@app.context_processor
+def inject_branding():
+    """Make the BRAND_* config available to every template.
+
+    A context processor rather than extra kwargs at each ``render_template``:
+    tissuumaps.html is rendered from five places, and threading the same values
+    through all of them is five chances to miss one and serve a page with no
+    logo. Defaults are TissUUmaps' own, so an installation that configures
+    nothing renders exactly as it does today.
+    """
+    return {
+        "brand_name": app.config.get("BRAND_NAME", "TissUUmaps"),
+        "brand_url": app.config.get("BRAND_URL", "https://tissuumaps.github.io/"),
+        "brand_badge_logo": app.config.get("BRAND_BADGE_LOGO", "misc/logo.svg"),
+        "brand_navbar_logo": app.config.get("BRAND_NAVBAR_LOGO", "misc/logo_40.png"),
+        "brand_navbar_logo_width": app.config.get("BRAND_NAVBAR_LOGO_WIDTH", 25),
+        "brand_navbar_logo_height": app.config.get("BRAND_NAVBAR_LOGO_HEIGHT", 27),
+        "brand_credit": app.config.get("BRAND_CREDIT", True),
+        "brand_logo_includes_name": app.config.get("BRAND_LOGO_INCLUDES_NAME", False),
+    }
+
+
 @app.route("/")
 @requires_auth
 def index():
@@ -1457,6 +1479,6 @@ def get_file_tree_data(root_path):
 def favicon():
     return send_from_directory(
         os.path.join(app.root_path, "static"),
-        "misc/favicon.ico",
+        app.config.get("BRAND_FAVICON", "misc/favicon.ico"),
         mimetype="image/vnd.microsoft.icon",
     )
