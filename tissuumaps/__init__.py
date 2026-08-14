@@ -53,9 +53,10 @@ PROJECT_LIST = False
 # that sets none of these looks exactly as it does today.
 #
 # BRAND_CREDIT keeps the "powered by TissUUmaps" line and its link visible even
-# when the rest is rebranded. The MIT licence does not require attribution in the
-# UI, only that the copyright notice ships -- this is courtesy, and it is on by
-# default so that rebranding never silently drops credit.
+# when the rest is rebranded. It defaults to on so that rebranding never silently
+# drops credit. No licensing claim is made here -- this file's own header carries
+# GPLv3 boilerplate while LICENSE and setup.cfg both say MIT, and that
+# contradiction is not one a config comment should try to settle.
 BRAND_NAME = "TissUUmaps"
 BRAND_URL = "https://tissuumaps.github.io/"
 BRAND_BADGE_LOGO = "misc/logo.svg"  # bottom-left badge, ~22px tall

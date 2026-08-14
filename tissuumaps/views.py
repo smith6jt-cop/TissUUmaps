@@ -1477,8 +1477,14 @@ def get_file_tree_data(root_path):
 
 @app.route("/favicon.ico")
 def favicon():
+    # Mimetype guessed from the configured file rather than forced to ICO: a
+    # deployment overriding BRAND_FAVICON may reasonably point at a .png or .svg,
+    # and serving those as image/vnd.microsoft.icon is simply wrong. Falls back
+    # to the ICO type when the name has no recognised extension.
+    favicon_path = app.config.get("BRAND_FAVICON", "misc/favicon.ico")
+    mimetype = mimetypes.guess_type(favicon_path)[0] or "image/vnd.microsoft.icon"
     return send_from_directory(
         os.path.join(app.root_path, "static"),
-        app.config.get("BRAND_FAVICON", "misc/favicon.ico"),
-        mimetype="image/vnd.microsoft.icon",
+        favicon_path,
+        mimetype=mimetype,
     )

@@ -44,7 +44,12 @@
         class="navbar navbar-expand-lg navbar-light border-bottom border-dark flex-shrink-0 {% if isStandalone %}d-none{% endif %}"
       >
         <div class="container-fluid">
-          <a class="navbar-brand pt-0" target="_blank" href="{{ brand_url }}">
+          <a
+            class="navbar-brand pt-0"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="{{ brand_url }}"
+          >
             <img
               src="static/{{ brand_navbar_logo }}"
               width="{{ brand_navbar_logo_width }}"
@@ -675,7 +680,7 @@
            would break them for no visible gain. -->
       <div class="px-1 me-3 viewer-layer">
         <small
-          ><a href="{{ brand_url }}" target="_blank"
+          ><a href="{{ brand_url }}" target="_blank" rel="noopener noreferrer"
             ><img
               src="static/{{ brand_badge_logo }}"
               height="22px"
@@ -686,7 +691,10 @@
           >{% if brand_credit and brand_name != "TissUUmaps" %}
           <span class="opacity-75"
             >powered by
-            <a href="https://tissuumaps.github.io/" target="_blank"
+            <a
+              href="https://tissuumaps.github.io/"
+              target="_blank"
+              rel="noopener noreferrer"
               >TissUUmaps</a
             ></span
           >{% endif %}</small
