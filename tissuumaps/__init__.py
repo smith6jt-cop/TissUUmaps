@@ -58,7 +58,7 @@ PROJECT_LIST = False
 # default so that rebranding never silently drops credit.
 BRAND_NAME = "TissUUmaps"
 BRAND_URL = "https://tissuumaps.github.io/"
-BRAND_BADGE_LOGO = "misc/logo.svg"      # bottom-left badge, ~22px tall
+BRAND_BADGE_LOGO = "misc/logo.svg"  # bottom-left badge, ~22px tall
 BRAND_NAVBAR_LOGO = "misc/logo_40.png"  # navbar brand mark
 BRAND_NAVBAR_LOGO_WIDTH = 25
 BRAND_NAVBAR_LOGO_HEIGHT = 27
